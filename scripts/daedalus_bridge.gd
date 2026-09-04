@@ -72,7 +72,7 @@ const HOST_FUNCTIONS := [
 ]
 
 var vm: NovaVM = null
-var ready := false
+var vm_ready := false      # NOT "ready" -- that shadows Node's own `ready` signal
 var error := ""
 
 # -- ships -------------------------------------------------------------
@@ -118,7 +118,7 @@ func _ready() -> void:
 
 func load_rules(path: String = RULES_PATH) -> bool:
 	error = ""
-	ready = false
+	vm_ready = false
 	events.clear()
 	_t_elapsed = 0.0
 
@@ -145,14 +145,14 @@ func load_rules(path: String = RULES_PATH) -> bool:
 	if error != "":
 		return _abort(error)
 
-	ready = true
+	vm_ready = true
 	data_loaded.emit(summary())
 	return true
 
 
 func _abort(message: String) -> bool:
 	error = message
-	ready = false
+	vm_ready = false
 	push_error("[DaedalusBridge] " + error)
 	load_failed.emit(error)
 	return false
@@ -178,8 +178,8 @@ func _require(source: Dictionary, keys: Array, where: String) -> bool:
 # Host functions -- the advisor's vocabulary
 # ==========================================================================
 
-func _host_fn(name: String) -> Callable:
-	match name:
+func _host_fn(fn_name: String) -> Callable:
+	match fn_name:
 		"log":
 			return _fn_log
 		"alarm":
@@ -590,8 +590,8 @@ func ship_hardened(key: String) -> bool:
 	return bool(ships.get(key, {}).get("hardened", false))
 
 
-func stat(key: String, name: String, fallback: float = 0.0) -> float:
-	return float(ships.get(key, {}).get(name, fallback))
+func stat(key: String, field_name: String, fallback: float = 0.0) -> float:
+	return float(ships.get(key, {}).get(field_name, fallback))
 
 
 # ==========================================================================
@@ -631,8 +631,8 @@ func enemy_name(kind: String) -> String:
 	return String(get_enemy_stats(kind).get("name", kind))
 
 
-func enemy_stat(kind: String, name: String, fallback: float = 0.0) -> float:
-	return float(get_enemy_stats(kind).get(name, fallback))
+func enemy_stat(kind: String, field_name: String, fallback: float = 0.0) -> float:
+	return float(get_enemy_stats(kind).get(field_name, fallback))
 
 
 ## What a hostile's gun does to a named player hull. Bounded by the
@@ -920,7 +920,7 @@ static func _dict_close(a: Dictionary, b) -> bool:
 func summary() -> Dictionary:
 	var d := vm.describe() if vm != null else {}
 	return {
-		"ok": ready,
+		"ok": vm_ready,
 		"title": d.get("title", ""),
 		"version": d.get("version", 0),
 		"ships": ships.size(),
@@ -932,7 +932,7 @@ func summary() -> Dictionary:
 
 
 func debug_print() -> void:
-	if not ready:
+	if not vm_ready:
 		print("[DaedalusBridge] NOT LOADED: ", error)
 		return
 	print("[DaedalusBridge] %s v%d -- %d ships, %d enemy kinds, %d weapons, %d sectors"
