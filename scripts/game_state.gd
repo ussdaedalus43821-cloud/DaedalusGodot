@@ -1,5 +1,9 @@
-class_name GameState
 extends Node
+# No class_name here: this script IS the "GameState" autoload singleton
+# (see project.godot's [autoload] section) -- a class_name of the same
+# name is a global-name collision Godot rejects at parse time ("Class
+# 'GameState' hides an autoload singleton"), and nothing in this project
+# type-hints against it, so the autoload registration alone is enough.
 
 ## Settings and run-in-progress state shared between the title screen, ship
 ## select, settings panel and a live run. An autoload (see project.godot's

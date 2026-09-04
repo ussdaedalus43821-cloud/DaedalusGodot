@@ -1,5 +1,8 @@
-class_name AudioBus
 extends Node
+# No class_name here: this script IS the "AudioBus" autoload singleton
+# (see project.godot's [autoload] section) -- a class_name of the same
+# name is a global-name collision Godot rejects at parse time, and
+# nothing in this project type-hints against it.
 
 ## Procedural sound via AudioStreamGenerator -- no audio assets ship with
 ## this project (see assets/audio/README.txt). Three channels, each an
