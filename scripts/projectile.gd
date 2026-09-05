@@ -19,8 +19,11 @@ extends Area2D
 ## Physics layers (see project.godot's [layer_names]):
 ##   1 player_hull   2 enemy_hull   3 player_shot   4 enemy_shot
 ## A friendly shot's mask is enemy_hull only; a hostile shot's mask is
-## player_hull only -- there is no friendly fire, and a projectile can
-## never even receive an area_entered for the wrong side.
+## player_hull only -- there is no ordinary friendly fire, and a
+## projectile can never receive an area_entered for the wrong side.
+## The one exception is god mode's silent interception (see
+## _intercept_for_god_mode()): a hostile round bent onto another
+## hostile gets its mask widened to enemy_hull instead.
 
 const LAYER_PLAYER_HULL := 1
 const LAYER_ENEMY_HULL := 2
@@ -45,7 +48,14 @@ const WEAPON_COLORS := {
 var weapon_type := "primary"
 var attacker_key := ""      # player ship key -- empty for a hostile round
 var attacker_kind := ""     # hostile kind -- empty for a player round
+var attacker_node: Node2D = null   # the Enemy that fired this, if any -- see _nearest_other_hostile()
 var friendly := true
+
+## Set once by _intercept_for_god_mode() -- a hostile round that's been
+## bent onto another hostile instead of the player needs to actually be
+## ABLE to hit one, which its collision_mask (LAYER_PLAYER_HULL only,
+## normally) does not allow. See _configure_collision().
+var _redirected := false
 
 var velocity := Vector2.ZERO
 var life := 2.0
@@ -66,6 +76,7 @@ func setup(cfg: Dictionary) -> void:
 	weapon_type = String(cfg.get("weapon_type", "primary"))
 	attacker_key = String(cfg.get("attacker_key", ""))
 	attacker_kind = String(cfg.get("attacker_kind", ""))
+	attacker_node = cfg.get("attacker_node", null)
 	friendly = bool(cfg.get("friendly", true))
 	target = cfg.get("target", null)
 
@@ -96,8 +107,51 @@ func setup(cfg: Dictionary) -> void:
 			target_class = target.get_ship_class()
 		turn_rate = deg_to_rad(Daedalus.homing_turn_rate(target_class))
 
+	if not friendly and weapon_type == "enemy_gun" and GameState.god_mode:
+		_intercept_for_god_mode()
+
 	_configure_visual()
 	_configure_collision()
+
+
+## God mode, from the player's side, produces nothing to see or hear --
+## no aura, no HUD banner, no change to how or when hostiles fire. It
+## works entirely here, after a hostile round already exists: bent onto
+## the nearest OTHER hostile (never the shooter itself, never a wingman)
+## with a turn rate sharp enough to visibly arc off its original line
+## long before it could reach the player. Damage, speed and color are
+## all untouched, so whatever it hits dies to what looks like an
+## ordinary hit -- the only tell, ever, is hostiles dying to shots that
+## were never aimed at them. If no other hostile is left to bend
+## toward, the round just fizzles in place rather than reaching the
+## player, which is what keeps the player genuinely untouchable without
+## a blanket damage-block anywhere in this file.
+func _intercept_for_god_mode() -> void:
+	var victim := _nearest_other_hostile()
+	if victim == null:
+		life = minf(life, 0.05)
+		return
+	target = victim
+	turn_rate = deg_to_rad(900.0)
+	_redirected = true
+
+
+func _nearest_other_hostile() -> Node2D:
+	var best: Node2D = null
+	var best_dist := INF
+	for hb in get_tree().get_nodes_in_group("enemy_hull"):
+		if not is_instance_valid(hb):
+			continue
+		var victim = hb.get_parent()
+		if victim == null or not is_instance_valid(victim) or victim == attacker_node:
+			continue
+		if "alive" in victim and not victim.alive:
+			continue
+		var d := global_position.distance_to(victim.global_position)
+		if d < best_dist:
+			best_dist = d
+			best = victim
+	return best
 
 
 func _configure_visual() -> void:
@@ -143,7 +197,7 @@ func _configure_collision() -> void:
 		collision_mask = LAYER_ENEMY_HULL
 	else:
 		collision_layer = LAYER_ENEMY_SHOT
-		collision_mask = LAYER_PLAYER_HULL
+		collision_mask = LAYER_ENEMY_HULL if _redirected else LAYER_PLAYER_HULL
 	area_entered.connect(_on_area_entered)
 
 

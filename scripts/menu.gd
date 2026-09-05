@@ -108,6 +108,7 @@ const CONTROL_LINES := [
 	"G                             Spawn wingman",
 	"Tab                           Cycle ship",
 	"M                             Toggle minimap",
+	"H                             Toggle god mode",
 	"0-9                           Hyperjump to sector",
 	"Esc                           Pause / menu",
 ]

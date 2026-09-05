@@ -78,7 +78,6 @@ var cloaked := false
 var infested := 0.0
 var alive := true
 
-var god_mode := false
 var infinite_ammo := false
 var cloak_available := true
 
@@ -389,7 +388,12 @@ func _regen(delta: float) -> void:
 
 
 func take_damage(amount: float, from_dir: Vector2 = Vector2.ZERO) -> void:
-	if not alive or god_mode or amount <= 0.0:
+	# A gun round fired at the player is intercepted and redirected long
+	# before it could ever call this (see projectile.gd's god-mode
+	# interception) -- this guard is what's left of "invincible" for the
+	# hostile attacks that never go through a Projectile at all: an Ori's
+	# beam and a Dive-Bomber's ram both call take_damage() directly.
+	if not alive or GameState.god_mode or amount <= 0.0:
 		return
 	if from_dir.length_squared() > 1e-9:
 		shield_hit_dir = from_dir.normalized()
@@ -413,7 +417,9 @@ func take_damage(amount: float, from_dir: Vector2 = Vector2.ZERO) -> void:
 
 
 func add_infestation(amount: float) -> void:
-	if hardened or god_mode:
+	# Same reasoning as take_damage()'s guard -- a Replicator's infection
+	# bolt has no Projectile to intercept, so this stays a direct block.
+	if hardened or GameState.god_mode:
 		return
 	infested = clampf(infested + amount, 0.0, 1.6)
 

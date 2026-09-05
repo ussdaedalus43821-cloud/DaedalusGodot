@@ -472,6 +472,10 @@ func _fire_gun_at(target: Node2D) -> void:
 	shot.setup({
 		"weapon_type": "enemy_gun",
 		"attacker_kind": kind,
+		# So god mode's interception (see projectile.gd) never bends a
+		# hostile's own shot back into itself -- this ship never knows
+		# either way, it just fires exactly as it always has.
+		"attacker_node": self,
 		"friendly": is_wingman(),
 		"position": _muzzle.global_position,
 		"direction": dir,
@@ -553,6 +557,12 @@ func _handle_beam_cycle(delta: float, target: Node2D) -> void:
 # Damage / death
 # ==========================================================================
 
+## Nothing here needs to know why a hit landed -- take_damage() already
+## treats every attacker generically. That's what makes god mode's
+## interception (projectile.gd) work with no changes here beyond
+## _fire_gun_at() passing attacker_node above: a hostile's own gun round,
+## redirected onto another hostile, lands on this exact same path a
+## player's shot would have taken, computed the exact same way.
 func take_damage(amount: float, from_dir: Vector2 = Vector2.ZERO) -> void:
 	if not alive or amount <= 0.0 or docking:
 		return

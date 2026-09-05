@@ -24,6 +24,7 @@ const BINDINGS := {
 	"spawn_wingman": [KEY_G],
 	"cycle_ship": [KEY_TAB],
 	"toggle_minimap": [KEY_M],
+	"toggle_god_mode": [KEY_H],
 	"pause_menu": [KEY_ESCAPE],
 }
 

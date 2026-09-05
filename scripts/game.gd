@@ -96,7 +96,6 @@ func _spawn_player() -> void:
 	player.ship_key = GameState.selected_ship
 	_combatants.add_child(player)
 	player.projectiles_root = _projectiles
-	player.god_mode = GameState.god_mode
 	player.infinite_ammo = GameState.infinite_ammo
 	player.cloak_available = GameState.cloak_available
 	player.died.connect(_on_player_died)
@@ -178,6 +177,8 @@ func _unhandled_input(event: InputEvent) -> void:
 		_minimap.visible = not _minimap.visible
 	elif event.is_action_pressed("cycle_ship"):
 		_cycle_ship()
+	elif event.is_action_pressed("toggle_god_mode"):
+		GameState.god_mode = not GameState.god_mode
 
 
 func _unhandled_key_input(event: InputEvent) -> void:

@@ -27,7 +27,6 @@ var _score_label: Label
 var _sector_label: Label
 var _contacts_label: Label
 
-var _chip_god: Label
 var _chip_cloak: Label
 var _chip_shields: Label
 var _chip_hull: Label
@@ -135,7 +134,6 @@ func _build_status_chips() -> void:
 	panel.position = Vector2(20, 240)
 	add_child(panel)
 
-	_chip_god = _chip(panel, "GOD MODE", Vector2(0, 0), Color(1, 0.9, 0.3))
 	_chip_cloak = _chip(panel, "CLOAK ACTIVE", Vector2(0, 18), Color(0.5, 0.9, 0.9))
 	_chip_shields = _chip(panel, "SHIELDS REBUILDING", Vector2(0, 36), Color(0.6, 0.8, 1.0))
 	_chip_hull = _chip(panel, "HULL CRITICAL", Vector2(0, 54), Color(1, 0.3, 0.3))
@@ -236,7 +234,6 @@ func _count(group: String) -> int:
 
 
 func _update_chips() -> void:
-	_chip_god.visible = player.god_mode
 	_chip_cloak.visible = player.cloaked
 	_chip_shields.visible = player.shield < player.shield_max
 	_chip_hull.visible = (player.hull / maxf(player.hull_max, 1.0)) < 0.3
