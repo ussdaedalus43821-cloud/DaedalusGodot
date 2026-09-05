@@ -25,10 +25,18 @@ var _sweep_angle := 0.0
 
 
 func _ready() -> void:
-	set_anchors_preset(Control.PRESET_TOP_RIGHT)
 	custom_minimum_size = Vector2(MAP_RADIUS, MAP_RADIUS) * 2.0
-	size = custom_minimum_size
-	position = Vector2(-(MAP_RADIUS * 2.0 + 20.0), 20.0)
+	set_anchors_preset(Control.PRESET_TOP_RIGHT)
+	# Control.position/size always operate in absolute parent-local space,
+	# even under a corner anchor -- assigning them here (as this used to)
+	# placed the rect at local x < 0, off the left edge of the viewport,
+	# no matter how wide the window was. offset_* is the actual anchor-
+	# relative inset (what the editor's own Position/Size fields show for
+	# a widget anchored like this), so those are what place it correctly.
+	offset_left = -(MAP_RADIUS * 2.0 + 20.0)
+	offset_right = -20.0
+	offset_top = 20.0
+	offset_bottom = MAP_RADIUS * 2.0 + 20.0
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
 
 
