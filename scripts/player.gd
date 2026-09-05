@@ -553,12 +553,20 @@ func _fire_rocket() -> void:
 	_spawn_shot("rocket")
 
 
+## Ported to match daedalus.py's try_fire_homing(): "tgt = targets[i %
+## len(targets)] # fan the salvo across targets" -- every drone in the
+## salvo gets its OWN lock, cycling through up to `salvo` distinct
+## nearby hostiles (nearest first, same _nearest_enemies() Destiny's
+## turrets already use, wrapping back through the same ones if fewer
+## hostiles exist) instead of every drone chasing one shared lock and
+## converging on top of each other in flight.
 func _fire_homing() -> void:
 	if homing <= 0 and not infinite_ammo:
 		return
 	var acquire_range := Daedalus.effective_range("homing")
-	var lock := _find_nearest_enemy(acquire_range)
-	if lock == null:
+	var salvo := Daedalus.homing_salvo_size(ship_key)
+	var targets := _nearest_enemies(acquire_range, salvo)
+	if targets.is_empty():
 		return
 	var cost := Daedalus.weapon_cost("homing")
 	if not _spend_power(cost):
@@ -567,12 +575,12 @@ func _fire_homing() -> void:
 		homing -= 1
 	_homing_cd = Daedalus.weapon_stat("homing", "cooldown", 1.1)
 
-	var salvo := Daedalus.homing_salvo_size(ship_key)
 	for i in range(salvo):
 		var spread := 0.0
 		if salvo > 1:
 			spread = deg_to_rad(lerp(-HOMING_SPREAD_DEG, HOMING_SPREAD_DEG,
 					float(i) / float(salvo - 1)))
+		var lock: Node2D = targets[i % targets.size()]
 		_spawn_shot("homing", spread, lock)
 
 
