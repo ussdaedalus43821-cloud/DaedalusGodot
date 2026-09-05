@@ -95,6 +95,7 @@ var projectiles_root: Node = null   # assigned by game.gd
 @onready var _hurtbox_shape: CollisionShape2D = $Hurtbox/Shape
 @onready var _muzzle: Marker2D = $Muzzle
 var _hull_poly: Polygon2D = null
+var _hull_sprite: Sprite2D = null
 var _beam_line: Line2D = null
 var _engine_trail: GPUParticles2D = null
 
@@ -173,14 +174,49 @@ const HULL_COLORS := {
 	"atlantis": Color(0.95, 0.85, 0.55),
 }
 
+## Real hull art, keyed by ship_key -- a ship not listed here still gets
+## the procedural Polygon2D below. path: a plain JPEG (no alpha) shot
+## top-down with the nose pointing up the frame; hull_length_px is that
+## image's nose-to-tail extent in pixels, used to scale it down to
+## HULL_TARGET_LENGTH world units so a real hull matches the size the
+## placeholder shapes already fly at.
+const HULL_TEXTURES := {
+	"daedalus": {"path": "res://assets/ships/daedalus_hull.jpg", "hull_length_px": 892.0},
+}
+const HULL_TARGET_LENGTH := 46.0   # nose-to-tail span of the default hull shape below
+const HULL_KEY_SHADER := preload("res://assets/ships/hull_luma_key.gdshader")
+
 func _build_visual() -> void:
 	if _hull_poly != null:
 		_hull_poly.queue_free()
-	_hull_poly = Polygon2D.new()
-	_hull_poly.polygon = _hull_shape_for(ship_class_name)
-	_hull_poly.color = HULL_COLORS.get(ship_key, Color.WHITE)
-	add_child(_hull_poly)
-	move_child(_hull_poly, 0)
+		_hull_poly = null
+	if _hull_sprite != null:
+		_hull_sprite.queue_free()
+		_hull_sprite = null
+
+	if HULL_TEXTURES.has(ship_key):
+		var spec: Dictionary = HULL_TEXTURES[ship_key]
+		_hull_sprite = Sprite2D.new()
+		_hull_sprite.texture = load(String(spec["path"]))
+		var mat := ShaderMaterial.new()
+		mat.shader = HULL_KEY_SHADER
+		_hull_sprite.material = mat
+		# The source render's nose points up the frame (-Y); this
+		# project's forward is local +X (Vector2.RIGHT.rotated(rotation)
+		# everywhere else in this file), so the sprite itself needs a
+		# fixed +90 degree offset -- independent of the ship's own
+		# steering rotation, which still drives the whole Player node.
+		_hull_sprite.rotation = deg_to_rad(90.0)
+		var scale_factor := HULL_TARGET_LENGTH / float(spec["hull_length_px"])
+		_hull_sprite.scale = Vector2(scale_factor, scale_factor)
+		add_child(_hull_sprite)
+		move_child(_hull_sprite, 0)
+	else:
+		_hull_poly = Polygon2D.new()
+		_hull_poly.polygon = _hull_shape_for(ship_class_name)
+		_hull_poly.color = HULL_COLORS.get(ship_key, Color.WHITE)
+		add_child(_hull_poly)
+		move_child(_hull_poly, 0)
 
 	_beam_line = Line2D.new()
 	_beam_line.width = 4.0
