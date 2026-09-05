@@ -560,22 +560,30 @@ func _fire_rocket() -> void:
 ## turrets already use, wrapping back through the same ones if fewer
 ## hostiles exist) instead of every drone chasing one shared lock and
 ## converging on top of each other in flight.
+##
+## Ammo also matches the original exactly now: "n = min(n, self.homing)"
+## caps the salvo to whatever's left rather than always launching the
+## full salvo regardless, and "self.homing -= 1" inside the per-drone
+## loop spends one unit per drone actually launched, not one flat unit
+## per trigger pull.
 func _fire_homing() -> void:
 	if homing <= 0 and not infinite_ammo:
 		return
 	var acquire_range := Daedalus.effective_range("homing")
 	var salvo := Daedalus.homing_salvo_size(ship_key)
+	if not infinite_ammo:
+		salvo = mini(salvo, homing)
 	var targets := _nearest_enemies(acquire_range, salvo)
 	if targets.is_empty():
 		return
 	var cost := Daedalus.weapon_cost("homing")
 	if not _spend_power(cost):
 		return
-	if not infinite_ammo:
-		homing -= 1
 	_homing_cd = Daedalus.weapon_stat("homing", "cooldown", 1.1)
 
 	for i in range(salvo):
+		if not infinite_ammo:
+			homing -= 1
 		var spread := 0.0
 		if salvo > 1:
 			spread = deg_to_rad(lerp(-HOMING_SPREAD_DEG, HOMING_SPREAD_DEG,
