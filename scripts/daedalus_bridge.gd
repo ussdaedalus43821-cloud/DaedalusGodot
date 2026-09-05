@@ -413,6 +413,7 @@ func _cache_sectors() -> void:
 			"fighter_cd": _float_pair(src.get("fighter_cd", [5.0, 9.0])),
 			"mix": _weighted_mix(src.get("mix", [])),
 			"unique": String(src.get("unique", "")),
+			"tint": _color_from_rgb(src.get("tint", [10.0, 10.0, 14.0])),
 		}
 		if _sector_by_key.has(key):
 			_fail("two sectors both use key %d" % key)
@@ -425,6 +426,15 @@ static func _float_pair(value) -> Array:
 		return [5.0, 9.0]
 	var pair: Array = value
 	return [float(pair[0]), float(pair[1])]
+
+
+## A sector's background tint: [r, g, b] on the 0-255 scale the reference
+## Python engine used, converted to a Godot Color.
+static func _color_from_rgb(value) -> Color:
+	if typeof(value) != TYPE_ARRAY or (value as Array).size() < 3:
+		return Color(10.0 / 255.0, 10.0 / 255.0, 14.0 / 255.0)
+	var rgb: Array = value
+	return Color(float(rgb[0]) / 255.0, float(rgb[1]) / 255.0, float(rgb[2]) / 255.0)
 
 
 static func _weighted_mix(value) -> Array:

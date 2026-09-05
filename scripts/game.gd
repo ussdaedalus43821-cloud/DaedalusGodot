@@ -62,6 +62,9 @@ var _rng := RandomNumberGenerator.new()
 var player_scene: PackedScene = preload("res://scenes/player.tscn")
 var enemy_scene: PackedScene = preload("res://scenes/enemy.tscn")
 
+var _background: ColorRect = null
+var _starfield: Starfield = null
+
 @onready var _world: Node2D = $World
 @onready var _combatants: Node2D = $World/Combatants
 @onready var _projectiles: Node2D = $World/Projectiles
@@ -77,6 +80,7 @@ func _ready() -> void:
 	get_tree().paused = false
 
 	_spawn_player()
+	_setup_background()
 	_spawn_landmarks()
 	for i in range(GameState.starting_wingmen):
 		spawn_wingman()
@@ -107,6 +111,24 @@ func _spawn_player() -> void:
 	else:
 		sector_key = GameState.starting_sector
 		player.global_position = Vector2.ZERO
+
+
+## Built entirely in code, like the rest of this project's UI -- see
+## starfield.gd's own header comment for why.
+func _setup_background() -> void:
+	var bg_layer := CanvasLayer.new()
+	bg_layer.layer = -10
+	_background = ColorRect.new()
+	_background.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_background.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_background.color = Daedalus.sector(sector_key).get("tint", Color(0.04, 0.04, 0.055))
+	bg_layer.add_child(_background)
+	add_child(bg_layer)
+
+	_starfield = Starfield.new()
+	_world.add_child(_starfield)
+	_world.move_child(_starfield, 0)
+	_starfield.setup(self, player)
 
 
 # ==========================================================================
@@ -387,6 +409,8 @@ func _arrive() -> void:
 	sector_key = hyper_target_key
 	hyper_target_key = -1
 	gen_minutes = 0.0
+	if _background != null:
+		_background.color = Daedalus.sector(sector_key).get("tint", Color(0.04, 0.04, 0.055))
 
 	for node in get_tree().get_nodes_in_group("hostiles"):
 		if is_instance_valid(node):
