@@ -41,9 +41,14 @@ const HOMING_START := 8
 const HOMING_SPREAD_DEG := 7.0
 const CLOAK_MIN_POWER := 15.0    # cannot engage the cloak below this reserve
 
-## Shield bubble visual, ported from the Python prototype's
-## draw_shield_bubble(). Hurtbox radius (22.0) + the original's own
-## +10 bubble_pad.
+## Shield bubble, ported from the Python prototype's draw_shield_bubble()
+## and its collision note: "a shot is stopped at the bubble surface
+## while shields hold, at the hull once they're down." HULL_HURTBOX_RADIUS
+## matches player.tscn's own hurtbox_shape; SHIELD_BUBBLE_RADIUS is that
+## + the original's +10 bubble_pad. The Hurtbox's actual CollisionShape2D
+## is resized between the two live, in _tick_shield_visual() -- see its
+## own comment for why that needs a duplicated (not shared) shape.
+const HULL_HURTBOX_RADIUS := 22.0
 const SHIELD_BUBBLE_RADIUS := 32.0
 const SHIELD_COL := Color(90.0 / 255.0, 170.0 / 255.0, 255.0 / 255.0)
 
@@ -87,6 +92,7 @@ var projectile_scene: PackedScene = preload("res://scenes/projectile.tscn")
 var projectiles_root: Node = null   # assigned by game.gd
 
 @onready var _hurtbox: Area2D = $Hurtbox
+@onready var _hurtbox_shape: CollisionShape2D = $Hurtbox/Shape
 @onready var _muzzle: Marker2D = $Muzzle
 var _hull_poly: Polygon2D = null
 var _beam_line: Line2D = null
@@ -95,6 +101,10 @@ var _engine_trail: GPUParticles2D = null
 
 func _ready() -> void:
 	_hurtbox.add_to_group("player_hull")
+	# player.tscn's hurtbox_shape sub-resource is shared across every
+	# scene load; duplicating it here means resizing it in
+	# _tick_shield_visual() only ever affects this one ship.
+	_hurtbox_shape.shape = _hurtbox_shape.shape.duplicate()
 	load_ship(ship_key)
 	_build_visual()
 
@@ -237,6 +247,10 @@ func _physics_process(delta: float) -> void:
 func _tick_shield_visual(delta: float) -> void:
 	shield_flash = maxf(0.0, shield_flash - delta)
 	shield_break = maxf(0.0, shield_break - delta)
+	var target_radius := SHIELD_BUBBLE_RADIUS if shield > 0.0 else HULL_HURTBOX_RADIUS
+	var shape := _hurtbox_shape.shape as CircleShape2D
+	if shape.radius != target_radius:
+		shape.radius = target_radius
 	queue_redraw()
 
 

@@ -45,10 +45,13 @@ const DIVE_TIMEOUT := 3.0
 const INFECT_STEP := 0.18
 const RAM_HIT_RADIUS := 30.0
 
-## Shield bubble visual, ported from the Python prototype's
-## draw_shield_bubble(). Hurtbox radius (20.0) + the original's own
-## +10 bubble_pad. Tinted per-kind using the same KIND_COLORS a
-## wingman's own hull color already draws from.
+## Shield bubble, ported from the Python prototype's draw_shield_bubble()
+## and its collision note: "a shot is stopped at the bubble surface
+## while shields hold, at the hull once they're down." HULL_HURTBOX_RADIUS
+## matches enemy.tscn's own hurtbox_shape; SHIELD_BUBBLE_RADIUS is that
+## + the original's +10 bubble_pad. Tinted per-kind using the same
+## KIND_COLORS a wingman's own hull color already draws from.
+const HULL_HURTBOX_RADIUS := 20.0
 const SHIELD_BUBBLE_RADIUS := 30.0
 
 var kind := "fighter"
@@ -98,6 +101,7 @@ var projectile_scene: PackedScene = preload("res://scenes/projectile.tscn")
 var enemy_scene: PackedScene = preload("res://scenes/enemy.tscn")
 
 @onready var _hurtbox: Area2D = $Hurtbox
+@onready var _hurtbox_shape: CollisionShape2D = $Hurtbox/Shape
 @onready var _muzzle: Marker2D = $Muzzle
 var _hull_poly: Polygon2D = null
 var _beam_line: Line2D = null
@@ -155,6 +159,10 @@ func setup(cfg: Dictionary) -> void:
 	_hurtbox.collision_mask = 0
 	_hurtbox.monitoring = false
 	_hurtbox.monitorable = true
+	# enemy.tscn's hurtbox_shape sub-resource is shared across every
+	# spawned instance; duplicating it here means resizing it in
+	# _tick_shield_visual() only ever affects this one ship.
+	_hurtbox_shape.shape = _hurtbox_shape.shape.duplicate()
 	add_to_group("wingmen" if faction == "player" else "hostiles")
 	_build_visual()
 
@@ -205,6 +213,10 @@ func _physics_process(delta: float) -> void:
 func _tick_shield_visual(delta: float) -> void:
 	shield_flash = maxf(0.0, shield_flash - delta)
 	shield_break = maxf(0.0, shield_break - delta)
+	var target_radius := SHIELD_BUBBLE_RADIUS if shield > 0.0 else HULL_HURTBOX_RADIUS
+	var shape := _hurtbox_shape.shape as CircleShape2D
+	if shape.radius != target_radius:
+		shape.radius = target_radius
 	queue_redraw()
 
 
