@@ -30,7 +30,7 @@ press F5. There is nothing to install. The title screen
 
 | Key | Action |
 |---|---|
-| Mouse / A-D or arrows | Turn (mouse aims when no turn key is held) |
+| A-D or arrows | Turn |
 | W / Up | Thrust forward |
 | S / Down | Thrust reverse |
 | Space | Fire guns (Atlantis fires its omni-broadsides instead) |
@@ -49,8 +49,8 @@ automatically at the nearest hostile in range, matching
 `daedalus_weapons.nova`'s own "Point Defense (automated)" doctrine. On a
 touchscreen (checked via `DisplayServer.is_touchscreen_available()`,
 so this never appears on desktop or a non-touch web session) an on-screen
-joystick and button row (`scripts/touch_controls.gd`) replace WASD/mouse
-and the fire/cloak/wingman keys.
+joystick and button row (`scripts/touch_controls.gd`) replace WASD and
+the fire/cloak/wingman keys.
 
 ## Architecture notes
 

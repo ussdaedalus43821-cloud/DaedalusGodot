@@ -13,8 +13,8 @@ extends Control
 ## is no InputEventKey for "aim this direction" -- so the joystick
 ## publishes `active` / `direction` / `magnitude` on this node directly,
 ## in the "touch_joystick" group, and player.gd checks that group (falling
-## back to mouse-aim + WASD when no touch layer is present or engaged) --
-## see Player._handle_rotation() / Player._handle_thrust().
+## back to keyboard-only turning when no touch layer is present or
+## engaged) -- see Player._handle_rotation() / Player._handle_thrust().
 
 const JOYSTICK_RADIUS := 90.0
 const DEADZONE := 0.12

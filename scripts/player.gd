@@ -6,11 +6,13 @@ extends CharacterBody2D
 ## turn, every weapon's damage) comes from Daedalus.get_ship_stats(ship_key)
 ## at _ready(), never from a per-ship script or scene.
 ##
-## Movement is mouse-or-keyboard rotation (A/D turn directly; otherwise the
-## nose eases toward the cursor) plus forward/reverse thrust with
-## exponential damping for inertia -- both rate-limited by the ship's own
-## `turn` and `speed` stats, so a Daedalus and an F-302 feel like different
-## ships without a line of ship-specific movement code.
+## Movement is keyboard rotation (A/D or arrow keys turn directly; the
+## touch joystick does the same on a touchscreen) plus forward/reverse
+## thrust with exponential damping for inertia -- both rate-limited by
+## the ship's own `turn` and `speed` stats, so a Daedalus and an F-302
+## feel like different ships without a line of ship-specific movement
+## code. There is no mouse-aim: the ship never reacts to cursor
+## position, only to an actively held turn key or joystick direction.
 ##
 ## Every shot -- guns, rockets, homing, beam -- asks Daedalus "how much
 ## damage lands" and never computes that itself; this script only decides
@@ -229,14 +231,13 @@ func _handle_rotation(delta: float) -> void:
 		return
 
 	var touch := _touch_joystick()
-	var target: float
 	if touch != null and touch.active:
-		target = touch.direction.angle()
-	else:
-		target = (get_global_mouse_position() - global_position).angle()
-	var diff := wrapf(target - rotation, -PI, PI)
-	var max_delta := turn_rate * delta
-	rotation += clampf(diff, -max_delta, max_delta)
+		var target := touch.direction.angle()
+		var diff := wrapf(target - rotation, -PI, PI)
+		var max_delta := turn_rate * delta
+		rotation += clampf(diff, -max_delta, max_delta)
+	# Neither a turn key nor the touch joystick is active: hold heading.
+	# (No mouse-aim -- the ship no longer reacts to cursor position at all.)
 
 
 ## Touch input has no equivalent of "mouse position" to aim with, so the
