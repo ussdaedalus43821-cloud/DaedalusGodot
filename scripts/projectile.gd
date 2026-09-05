@@ -222,6 +222,17 @@ func _physics_process(delta: float) -> void:
 func _on_area_entered(area: Area2D) -> void:
 	if _spent:
 		return
+	# A redirected hostile round's mask now includes enemy_hull (see
+	# _configure_collision()), and it's born right at its own shooter's
+	# muzzle -- close enough to that shooter's own hurtbox to physically
+	# overlap it on the very first physics frame, before the turn toward
+	# its actual target has had any time to carry it away. Physics layers
+	# alone can't tell "your own shooter" from "any other hostile," so
+	# that one specific overlap is ignored here rather than treated as a
+	# hit -- the shot stays alive and still lands on whatever
+	# _nearest_other_hostile() actually picked once it curves onto it.
+	if attacker_node != null and area.get_parent() == attacker_node:
+		return
 	_spent = true
 	if blast_radius > 0.0:
 		_detonate(global_position)
