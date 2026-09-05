@@ -5,12 +5,14 @@ extends Node
 # nothing in this project type-hints against it.
 
 ## Procedural sound via AudioStreamGenerator -- no audio assets ship with
-## this project (see assets/audio/README.txt). Three channels, each an
+## this project (see assets/audio/README.txt). Four channels, each an
 ## AudioStreamGeneratorPlayback fed a plain sine wave every _process():
-## a looping "thrust" channel, a looping "beam" channel, and a one-shot
-## "sfx" channel for fire/explosion/hyperdrive blips (only one sfx tone
-## plays at a time -- a second call simply replaces the first, which is
-## enough for a placeholder and keeps this file small).
+## a looping "thrust" channel, a looping "beam" channel, a one-shot "sfx"
+## channel for fire/hyperdrive blips, and a one-shot "impact" channel for
+## play_explosion() specifically, throttled by IMPACT_MIN_GAP (see its
+## own comment for why that split exists). Within each one-shot channel,
+## only one tone plays at a time -- a second call simply replaces the
+## first, which is enough for a placeholder and keeps this file small.
 ##
 ## An autoload (name "AudioBus" in project.godot), so any script can call
 ## AudioBus.play_fire("rocket") etc. without holding a reference to it.
@@ -32,12 +34,29 @@ var _sfx_volume := 0.0
 var _sfx_remaining := 0.0
 var _sfx_phase := 0.0
 
+## Impacts (play_explosion()) get their own channel, separate from
+## weapon-fire/hyperdrive sfx above -- sharing one channel meant a hit
+## landing while you'd just fired (or ten hits landing across a single
+## frame during heavy combat) instantly snapped the shared channel's
+## frequency and reset its envelope, over and over, which is what reads
+## as "white noise" rather than distinct impacts. _IMPACT_MIN_GAP
+## throttles retriggering on top of that, so a barrage of simultaneous
+## hits collapses into a controlled beat instead of a continuous mess.
+const IMPACT_MIN_GAP := 0.05
+var _impact_playback: AudioStreamGeneratorPlayback
+var _impact_freq := 90.0
+var _impact_volume := 0.0
+var _impact_remaining := 0.0
+var _impact_phase := 0.0
+var _impact_cooldown := 0.0
+
 
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
 	_thrust_playback = _make_playback(-14.0)
 	_beam_playback = _make_playback(-10.0)
 	_sfx_playback = _make_playback(-6.0)
+	_impact_playback = _make_playback(-6.0)
 
 
 func _make_playback(volume_db: float) -> AudioStreamGeneratorPlayback:
@@ -52,7 +71,7 @@ func _make_playback(volume_db: float) -> AudioStreamGeneratorPlayback:
 	return player.get_stream_playback()
 
 
-func _process(_delta: float) -> void:
+func _process(delta: float) -> void:
 	# Gameplay scripts stop processing while paused (see game.gd's
 	# process_mode split), so whatever set_thrust()/set_beam() last said
 	# would otherwise keep looping silently-not-silent for as long as the
@@ -61,6 +80,8 @@ func _process(_delta: float) -> void:
 	_fill(_thrust_playback, _thrust_active and not paused, 55.0, 0.5, "_thrust_phase")
 	_fill(_beam_playback, _beam_active and not paused, 220.0, 0.4, "_beam_phase")
 	_fill_sfx()
+	_fill_impact()
+	_impact_cooldown = maxf(0.0, _impact_cooldown - delta)
 
 
 ## `phase_field` names one of this script's own float fields to advance --
@@ -91,6 +112,19 @@ func _fill_sfx() -> void:
 			_sfx_phase = fmod(_sfx_phase + TAU * _sfx_freq / MIX_RATE, TAU)
 			_sfx_remaining -= dt
 		_sfx_playback.push_frame(Vector2(sample, sample))
+
+
+func _fill_impact() -> void:
+	var frames := _impact_playback.get_frames_available()
+	var dt := 1.0 / MIX_RATE
+	for i in range(frames):
+		var sample := 0.0
+		if _impact_remaining > 0.0:
+			var envelope := clampf(_impact_remaining / 0.04, 0.0, 1.0)
+			sample = sin(_impact_phase) * _impact_volume * envelope
+			_impact_phase = fmod(_impact_phase + TAU * _impact_freq / MIX_RATE, TAU)
+			_impact_remaining -= dt
+		_impact_playback.push_frame(Vector2(sample, sample))
 
 
 # ==========================================================================
@@ -124,7 +158,12 @@ func play_fire(weapon_type: String) -> void:
 
 
 func play_explosion() -> void:
-	play_tone(90.0, 0.35, 0.5)
+	if _impact_cooldown > 0.0:
+		return
+	_impact_cooldown = IMPACT_MIN_GAP
+	_impact_freq = 90.0
+	_impact_remaining = 0.35
+	_impact_volume = 0.5
 
 
 func play_hyperdrive_charge() -> void:
