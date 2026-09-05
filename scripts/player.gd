@@ -53,6 +53,21 @@ const HULL_HURTBOX_RADIUS := 22.0
 const SHIELD_BUBBLE_RADIUS := 32.0
 const SHIELD_COL := Color(90.0 / 255.0, 170.0 / 255.0, 255.0 / 255.0)
 
+## Replicator infestation, ported from the Python prototype's tick_common():
+## a hit only ever KICKSTARTS it (see add_infestation()) -- once started it
+## grows toward catastrophic failure on its own over INFEST_DURATION,
+## draining hull faster and faster (INFEST_DPS_START -> INFEST_DPS_END,
+## plus INFEST_FAILURE_DPS once it reaches 100%), regardless of further
+## hits landing. The original also lets repair drones claw a partial cure
+## back below a 50% ceiling; this port has no repair-drone system for
+## either side at all yet, so that half is deliberately not ported --
+## once infested here, there is currently no way to stop it short of
+## dying, ending the run, or (per game.gd's _arrive()) jumping sectors.
+const INFEST_DURATION := 15.0
+const INFEST_DPS_START := 6.0
+const INFEST_DPS_END := 55.0
+const INFEST_FAILURE_DPS := 160.0
+
 var ship_key := "daedalus"
 
 var stats: Dictionary = {}
@@ -293,6 +308,9 @@ func _physics_process(delta: float) -> void:
 	_handle_cloak_input()
 	_handle_wingman_input()
 	_regen(delta)
+	_tick_infestation(delta)
+	if not alive:
+		return
 	_auto_turret(delta)
 	_tick_shield_visual(delta)
 
@@ -424,12 +442,39 @@ func take_damage(amount: float, from_dir: Vector2 = Vector2.ZERO) -> void:
 		_die()
 
 
-func add_infestation(amount: float) -> void:
+## Matches the Python original's infect(): a hit only ever kickstarts
+## infestation from zero -- once infested > 0, _tick_infestation() below
+## grows it and drains hull on its own every frame regardless of how many
+## further infection hits land, so there's nothing for a magnitude
+## argument to do here.
+func add_infestation() -> void:
 	# Same reasoning as take_damage()'s guard -- a Replicator's infection
 	# bolt has no Projectile to intercept, so this stays a direct block.
 	if hardened or GameState.god_mode:
 		return
-	infested = clampf(infested + amount, 0.0, 1.6)
+	if infested <= 0.0:
+		infested = 0.02
+
+
+## Growth is unconditional (matches the original: infestation keeps
+## climbing even while otherwise invincible), only the resulting hull
+## drain is gated by god mode -- consistent with take_damage()'s guard
+## being what stands in for "invincible" against every attack type that
+## has no Projectile of its own to redirect instead.
+func _tick_infestation(delta: float) -> void:
+	if infested <= 0.0:
+		return
+	infested = minf(1.6, infested + delta / INFEST_DURATION)
+	var frac := clampf(infested, 0.0, 1.0)
+	var dps := INFEST_DPS_START + (INFEST_DPS_END - INFEST_DPS_START) * frac
+	if infested >= 1.0:
+		dps += INFEST_FAILURE_DPS
+	if GameState.god_mode:
+		return
+	hull -= dps * delta * GameState.difficulty_multiplier()
+	hull_changed.emit(hull, hull_max)
+	if hull <= 0.0:
+		_die()
 
 
 func _die() -> void:

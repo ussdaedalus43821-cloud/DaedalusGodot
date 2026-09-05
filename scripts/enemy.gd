@@ -42,7 +42,6 @@ const WINGMAN_COLOR := Color(0.4, 0.7, 1.0)
 
 const BURST_ROUND_INTERVAL := 0.15
 const DIVE_TIMEOUT := 3.0
-const INFECT_STEP := 0.18
 const RAM_HIT_RADIUS := 30.0
 
 ## God mode's "fear": a hostile's orbit standoff (_keep_dist) is inflated by
@@ -92,6 +91,7 @@ var hull_max := 0.0
 var max_speed := 0.0
 var turn_rate := 0.0    # rad/s
 var alive := true
+var infested := 0.0     # see add_infestation()/_tick_infestation() below
 
 var _keep_dist := 300.0
 var _strafe_dir := 1.0
@@ -238,6 +238,10 @@ func _build_visual() -> void:
 # ==========================================================================
 
 func _physics_process(delta: float) -> void:
+	if not alive:
+		return
+
+	_tick_infestation(delta)
 	if not alive:
 		return
 
@@ -570,16 +574,14 @@ func _handle_infection(delta: float, target: Node2D) -> void:
 	_fire_timer -= delta
 	if _fire_timer <= 0.0:
 		# Same redirect as every other attack type: while god mode is on,
-		# the bolt is aimed at the nearest OTHER hostile instead. Note
-		# this project's Enemy has no infestation mechanic of its own
-		# (only Player implements add_infestation()) -- has_method() below
-		# means a redirected bolt currently has nothing to actually do to
-		# the hostile it lands on, same as if no target were found at all.
+		# the bolt is aimed at the nearest OTHER hostile instead -- who
+		# now has its own infestation mechanic (see add_infestation()
+		# below) to actually take it.
 		var victim := target
 		if GameState.god_mode:
 			victim = _nearest_other_hostile()
 		if victim != null and victim.has_method("add_infestation"):
-			victim.add_infestation(INFECT_STEP)
+			victim.add_infestation()
 		var fc: Array = behavior.get("fire_cd", [1.7, 2.3])
 		_fire_timer = randf_range(float(fc[0]), float(fc[1]))
 
@@ -663,6 +665,34 @@ func take_damage(amount: float, from_dir: Vector2 = Vector2.ZERO) -> void:
 			shield_break = 0.4
 		else:
 			shield_flash = 0.22
+	if hull <= 0.0:
+		_die()
+
+
+## Unlike Player's version, this is never gated on GameState.god_mode --
+## god mode's whole point is redirecting attacks onto hostiles instead of
+## the player, so a hostile has to actually be infectable while it's on,
+## not immune to it. See Player.add_infestation()/Player.INFEST_DURATION
+## etc. for the shared constants and the full explanation of what this
+## kickstarts (growth and hull drain both live in _tick_infestation()
+## below, ticking on their own from here regardless of further hits).
+func add_infestation() -> void:
+	if infested <= 0.0:
+		infested = 0.02
+
+
+## No god-mode gate here either, and no GameState.difficulty_multiplier()
+## scaling -- matches take_damage()'s existing asymmetry with Player's:
+## difficulty only scales damage the PLAYER takes.
+func _tick_infestation(delta: float) -> void:
+	if infested <= 0.0:
+		return
+	infested = minf(1.6, infested + delta / Player.INFEST_DURATION)
+	var frac := clampf(infested, 0.0, 1.0)
+	var dps := Player.INFEST_DPS_START + (Player.INFEST_DPS_END - Player.INFEST_DPS_START) * frac
+	if infested >= 1.0:
+		dps += Player.INFEST_FAILURE_DPS
+	hull -= dps * delta
 	if hull <= 0.0:
 		_die()
 
