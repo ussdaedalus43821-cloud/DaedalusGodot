@@ -633,20 +633,33 @@ func _stop_beam() -> void:
 
 ## Destiny's five point-defense turrets: automatic, never player-triggered
 ## -- the same doctrine daedalus_weapons.nova documents for the "turret"
-## weapon type ("Point Defense (automated)").
+## weapon type ("Point Defense (automated)"). Matches daedalus.py's
+## auto_turrets() and the .nova file's own comment on turret_count:
+## "five turrets firing independently means an effective five-round
+## burst roughly every 0.47s, not one round" -- every cooldown tick
+## fires turret_count shots at once, spread across up to turret_count
+## distinct nearby hostiles (cycling back through the same targets if
+## fewer exist), each from its own point along the dorsal hull rather
+## than a single shot from one muzzle at one target.
 func _auto_turret(_delta: float) -> void:
 	if ship_key != "destiny" or _turret_cd > 0.0:
 		return
 	var turret_range := Daedalus.effective_range("turret")
-	var t := _find_nearest_enemy(turret_range)
-	if t == null:
+	var turret_count := int(Daedalus.weapon_stat("turret", "turret_count", 5.0))
+	var targets := _nearest_enemies(turret_range, turret_count)
+	if targets.is_empty():
 		return
 	_turret_cd = Daedalus.weapon_stat("turret", "cooldown", 0.47)
-	var dir := (t.global_position - _muzzle.global_position).normalized()
-	_spawn_shot_at_target("turret", dir)
+	var spread_span := 44.0
+	for i in range(turret_count):
+		var t: Node2D = targets[i % targets.size()]
+		var frac := float(i) / float(maxi(turret_count - 1, 1))
+		var mount := global_position + Vector2(-spread_span * 0.5 + spread_span * frac, -3.0).rotated(rotation)
+		var dir := (t.global_position - mount).normalized()
+		_spawn_shot_at_target("turret", dir, mount)
 
 
-func _spawn_shot_at_target(weapon_type: String, dir: Vector2) -> void:
+func _spawn_shot_at_target(weapon_type: String, dir: Vector2, origin: Vector2) -> void:
 	if projectiles_root == null:
 		return
 	var shot := projectile_scene.instantiate() as Projectile
@@ -655,7 +668,7 @@ func _spawn_shot_at_target(weapon_type: String, dir: Vector2) -> void:
 		"weapon_type": weapon_type,
 		"attacker_key": ship_key,
 		"friendly": true,
-		"position": _muzzle.global_position,
+		"position": origin,
 		"direction": dir,
 		"ship_velocity": Vector2.ZERO,
 	})
@@ -675,6 +688,27 @@ func _find_nearest_enemy(max_range: float) -> Node2D:
 			best_dist = d
 			best = victim
 	return best
+
+
+## Same search as _find_nearest_enemy(), but for _auto_turret(): collects
+## up to `count` hostiles in range, nearest first, instead of stopping at
+## just the one closest.
+func _nearest_enemies(max_range: float, count: int) -> Array:
+	var candidates: Array = []
+	for hb in get_tree().get_nodes_in_group("enemy_hull"):
+		if not is_instance_valid(hb):
+			continue
+		var victim = hb.get_parent()
+		if victim == null or not is_instance_valid(victim):
+			continue
+		var d := global_position.distance_to(victim.global_position)
+		if d <= max_range:
+			candidates.append([d, victim])
+	candidates.sort_custom(func(a, b): return a[0] < b[0])
+	var result: Array = []
+	for i in range(mini(count, candidates.size())):
+		result.append(candidates[i][1])
+	return result
 
 
 # ==========================================================================
