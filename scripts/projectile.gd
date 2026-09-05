@@ -271,6 +271,16 @@ func _direct_hit(area: Area2D) -> void:
 		var attacker_class := Daedalus.enemy_class(attacker_kind)
 		damage = Daedalus.effective_damage(raw, attacker_class, target_class)
 		victim.take_damage(damage, global_position - victim.global_position)
+		# God mode's other "psychological weapon" beat (see enemy.gd's
+		# panic()): both the shooter that just watched its own shot bend
+		# into an ally, and the ally it landed on, react. Only ever true
+		# here -- _redirected is only ever set for the one weapon_type
+		# this whole branch handles.
+		if _redirected:
+			if victim.has_method("panic"):
+				victim.panic()
+			if attacker_node != null and attacker_node.has_method("panic"):
+				attacker_node.panic()
 	else:
 		var dist := _spawn_pos.distance_to(global_position)
 		var result := Daedalus.fire_weapon(weapon_type, attacker_key, target_class, dist, 0.0)

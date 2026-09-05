@@ -52,6 +52,22 @@ const RAM_HIT_RADIUS := 30.0
 ## dive or a fleeing replicator, which already have their own movement.
 const FEAR_KEEP_DIST_MULT := 3.0
 
+## panic() is god mode's other "psychological weapon" beat: a hostile
+## that's just been on either end of a redirected friendly-fire hit
+## (see the panic() calls in projectile.gd's _direct_hit() and this
+## file's ram/beam/infection redirects) spends PANIC_DURATION_* seconds
+## visibly rattled -- firing/dive/spawn/beam timers frozen entirely
+## (_tick_timers() is skipped outright), movement cut to
+## PANIC_SPEED_MULT of normal, and a Skirmisher ("fighter") or Dart
+## breaking off to flee instead of orbiting. The very next gun round
+## fired once panic wears off goes wild (PANIC_WILD_SPREAD_DEG either
+## side of the real aim) rather than aimed, rather than modeling an
+## ongoing "spray and pray" mode.
+const PANIC_DURATION_MIN := 0.5
+const PANIC_DURATION_MAX := 1.0
+const PANIC_SPEED_MULT := 0.35
+const PANIC_WILD_SPREAD_DEG := 60.0
+
 ## Shield bubble, ported from the Python prototype's draw_shield_bubble()
 ## and its collision note: "a shot is stopped at the bubble surface
 ## while shields hold, at the hull once they're down." HULL_HURTBOX_RADIUS
@@ -110,6 +126,9 @@ var _stored_darts := 0
 
 var _fleeing := false
 var docking := false
+
+var _panic_timer := 0.0
+var _panic_wild_shot := false
 
 var _charging := false
 var _charge_timer := 1.0
@@ -245,6 +264,8 @@ func _physics_process(delta: float) -> void:
 	if not alive:
 		return
 
+	_panic_timer = maxf(0.0, _panic_timer - delta)
+
 	if kind == "replicator":
 		_fleeing = (hull / maxf(hull_max, 1.0)) < float(behavior.get("flee_hull_frac", 0.3))
 
@@ -253,9 +274,33 @@ func _physics_process(delta: float) -> void:
 		return
 
 	var target := _find_target()
-	_tick_timers(delta, target)
-	_move(delta, target)
+	if _panic_timer > 0.0:
+		_tick_panic(delta, target)
+	else:
+		_tick_timers(delta, target)
+		_move(delta, target)
 	_tick_shield_visual(delta)
+
+
+## Called on both ends of a redirected friendly-fire hit (see the file
+## header on where) -- never on a wingman, since only "hostiles" group
+## members are ever chosen as a redirect target or passed as
+## attacker_node in the first place.
+func panic() -> void:
+	if not alive:
+		return
+	_panic_timer = maxf(_panic_timer, randf_range(PANIC_DURATION_MIN, PANIC_DURATION_MAX))
+
+
+func _tick_panic(delta: float, target: Node2D) -> void:
+	if (kind == "fighter" or kind == "dart") and target != null:
+		_move_flee(delta, target)
+	else:
+		velocity = velocity.move_toward(Vector2.ZERO, max_speed * delta)
+	velocity *= PANIC_SPEED_MULT
+	move_and_slide()
+	if _panic_timer <= delta:
+		_panic_wild_shot = true
 
 
 ## Finds the player ship via the same "hurtbox's own group, then its
@@ -429,6 +474,9 @@ func _move_dart_dive(delta: float, target: Node2D) -> void:
 		if victim != null and victim.has_method("take_damage"):
 			var dmg := Daedalus.dart_ram_damage(velocity.length())
 			victim.take_damage(dmg, global_position - victim.global_position)
+			if GameState.god_mode:
+				victim.panic()
+				panic()
 		_end_dive()
 	elif _dive_elapsed > DIVE_TIMEOUT:
 		_end_dive()
@@ -519,6 +567,9 @@ func _fire_gun_at(target: Node2D) -> void:
 	if projectiles_root == null:
 		return
 	var dir := (target.global_position - _muzzle.global_position).normalized()
+	if _panic_wild_shot:
+		_panic_wild_shot = false
+		dir = dir.rotated(deg_to_rad(randf_range(-PANIC_WILD_SPREAD_DEG, PANIC_WILD_SPREAD_DEG)))
 	var shot := projectile_scene.instantiate() as Projectile
 	projectiles_root.add_child(shot)
 	shot.setup({
@@ -582,6 +633,9 @@ func _handle_infection(delta: float, target: Node2D) -> void:
 			victim = _nearest_other_hostile()
 		if victim != null and victim.has_method("add_infestation"):
 			victim.add_infestation()
+			if GameState.god_mode:
+				victim.panic()
+				panic()
 		var fc: Array = behavior.get("fire_cd", [1.7, 2.3])
 		_fire_timer = randf_range(float(fc[0]), float(fc[1]))
 
@@ -610,6 +664,12 @@ func _handle_beam_cycle(delta: float, target: Node2D) -> void:
 		if beam_target != null and beam_target.has_method("take_damage"):
 			var dps := float(behavior.get("beam_dps", 0.0))
 			beam_target.take_damage(dps * delta, global_position - beam_target.global_position)
+			# Victim only, not self -- the beam is continuous, so
+			# panicking the shooter every single tick it's firing would
+			# fight its own panic-freeze instead of reading as one
+			# reaction to one event the way the gun/ram/infection cases do.
+			if GameState.god_mode:
+				beam_target.panic()
 			# Stop the drawn line at beam_target's current hurtbox surface
 			# (shield bubble while shields hold, hull once they're down)
 			# rather than its center -- otherwise the beam visually spears
