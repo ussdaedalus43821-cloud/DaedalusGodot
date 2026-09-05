@@ -457,7 +457,7 @@ func _fire_beam(delta: float) -> void:
 		end_point = hit.position
 		var victim = hit.collider.get_parent()
 		if victim != null and is_instance_valid(victim) and victim.has_method("take_damage"):
-			var target_class := victim.get_ship_class() if victim.has_method("get_ship_class") else "fighter"
+			var target_class: String = victim.get_ship_class() if victim.has_method("get_ship_class") else "fighter"
 			var dps := Daedalus.beam_dps(base_dps, _beam_elapsed, target_class)
 			victim.take_damage(dps * delta)
 
