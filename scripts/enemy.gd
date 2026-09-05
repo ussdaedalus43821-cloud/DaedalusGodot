@@ -45,6 +45,14 @@ const DIVE_TIMEOUT := 3.0
 const INFECT_STEP := 0.18
 const RAM_HIT_RADIUS := 30.0
 
+## God mode's "fear": a hostile's orbit standoff (_keep_dist) is inflated by
+## this factor while it's engaging the player side, so it hangs back much
+## farther than it normally would rather than closing to a fight it can
+## never actually win. Applies to every kind via _move_orbit() -- fighter,
+## capital, an un-diving dart, hive, ori -- everything except a dart mid-
+## dive or a fleeing replicator, which already have their own movement.
+const FEAR_KEEP_DIST_MULT := 3.0
+
 ## Shield bubble, ported from the Python prototype's draw_shield_bubble()
 ## and its collision note: "a shot is stopped at the bubble surface
 ## while shields hold, at the hull once they're down." HULL_HURTBOX_RADIUS
@@ -382,10 +390,13 @@ static func _turn_toward(current: float, target: float, max_delta: float) -> flo
 func _move_orbit(delta: float, target: Node2D) -> void:
 	var to_target := target.global_position - global_position
 	var dist := to_target.length()
+	var keep_dist := _keep_dist
+	if faction == "hostile" and GameState.god_mode:
+		keep_dist *= FEAR_KEEP_DIST_MULT
 	var desired_dir: Vector2
-	if dist > _keep_dist * 1.08:
+	if dist > keep_dist * 1.08:
 		desired_dir = to_target.normalized()
-	elif dist < _keep_dist * 0.92:
+	elif dist < keep_dist * 0.92:
 		desired_dir = -to_target.normalized()
 	else:
 		desired_dir = to_target.normalized().rotated(PI * 0.5 * _strafe_dir)
@@ -403,9 +414,17 @@ func _move_dart_dive(delta: float, target: Node2D) -> void:
 
 	var dist := global_position.distance_to(target.global_position)
 	if dist < RAM_HIT_RADIUS:
-		var dmg := Daedalus.dart_ram_damage(velocity.length())
-		if target.has_method("take_damage"):
-			target.take_damage(dmg, global_position - target.global_position)
+		# The dive itself is untouched by god mode -- this Dart still
+		# beelines at and reaches the player exactly as always, same as a
+		# gun round still gets fired straight at the player before
+		# projectile.gd bends it. Only who actually takes the ram's
+		# damage is redirected, at the very last instant it would connect.
+		var victim := target
+		if GameState.god_mode:
+			victim = _nearest_other_hostile()
+		if victim != null and victim.has_method("take_damage"):
+			var dmg := Daedalus.dart_ram_damage(velocity.length())
+			victim.take_damage(dmg, global_position - victim.global_position)
 		_end_dive()
 	elif _dive_elapsed > DIVE_TIMEOUT:
 		_end_dive()
@@ -550,8 +569,17 @@ func _spawn_dart() -> void:
 func _handle_infection(delta: float, target: Node2D) -> void:
 	_fire_timer -= delta
 	if _fire_timer <= 0.0:
-		if target.has_method("add_infestation"):
-			target.add_infestation(INFECT_STEP)
+		# Same redirect as every other attack type: while god mode is on,
+		# the bolt is aimed at the nearest OTHER hostile instead. Note
+		# this project's Enemy has no infestation mechanic of its own
+		# (only Player implements add_infestation()) -- has_method() below
+		# means a redirected bolt currently has nothing to actually do to
+		# the hostile it lands on, same as if no target were found at all.
+		var victim := target
+		if GameState.god_mode:
+			victim = _nearest_other_hostile()
+		if victim != null and victim.has_method("add_infestation"):
+			victim.add_infestation(INFECT_STEP)
 		var fc: Array = behavior.get("fire_cd", [1.7, 2.3])
 		_fire_timer = randf_range(float(fc[0]), float(fc[1]))
 
