@@ -41,6 +41,12 @@ const HOMING_START := 8
 const HOMING_SPREAD_DEG := 7.0
 const CLOAK_MIN_POWER := 15.0    # cannot engage the cloak below this reserve
 
+## Shield bubble visual, ported from the Python prototype's
+## draw_shield_bubble(). Hurtbox radius (22.0) + the original's own
+## +10 bubble_pad.
+const SHIELD_BUBBLE_RADIUS := 32.0
+const SHIELD_COL := Color(90.0 / 255.0, 170.0 / 255.0, 255.0 / 255.0)
+
 var ship_key := "daedalus"
 
 var stats: Dictionary = {}
@@ -49,6 +55,9 @@ var hardened := false
 
 var shield := 0.0
 var shield_max := 0.0
+var shield_flash := 0.0      # rim ripple where a hit was just absorbed
+var shield_break := 0.0      # full-bubble flare where the shield just collapsed
+var shield_hit_dir := Vector2.RIGHT   # world-space unit vector: ship -> impact
 var hull := 0.0
 var hull_max := 0.0
 var power := 0.0
@@ -217,11 +226,25 @@ func _physics_process(delta: float) -> void:
 	_handle_wingman_input()
 	_regen(delta)
 	_auto_turret(delta)
+	_tick_shield_visual(delta)
 
 	if cloaked:
 		modulate.a = 0.35
 	else:
 		modulate.a = 1.0
+
+
+func _tick_shield_visual(delta: float) -> void:
+	shield_flash = maxf(0.0, shield_flash - delta)
+	shield_break = maxf(0.0, shield_break - delta)
+	queue_redraw()
+
+
+func _draw() -> void:
+	var hit_dir_local := shield_hit_dir.rotated(-rotation)
+	PlaceholderGfx.draw_shield_bubble(self, SHIELD_BUBBLE_RADIUS,
+			shield / maxf(shield_max, 0.001), shield_flash, hit_dir_local,
+			SHIELD_COL, shield_break)
 
 
 func _handle_rotation(delta: float) -> void:
@@ -300,9 +323,12 @@ func _regen(delta: float) -> void:
 	shield_changed.emit(shield, shield_max)
 
 
-func take_damage(amount: float) -> void:
+func take_damage(amount: float, from_dir: Vector2 = Vector2.ZERO) -> void:
 	if not alive or god_mode or amount <= 0.0:
 		return
+	if from_dir.length_squared() > 1e-9:
+		shield_hit_dir = from_dir.normalized()
+	var had_shield := shield > 0.0
 	var remaining := amount * GameState.difficulty_multiplier()
 	if shield > 0.0:
 		var absorbed := minf(shield, remaining)
@@ -310,6 +336,11 @@ func take_damage(amount: float) -> void:
 		remaining -= absorbed
 	if remaining > 0.0:
 		hull -= remaining
+	if had_shield:
+		if shield <= 0.0:
+			shield_break = 0.4       # collapsed on this hit
+		else:
+			shield_flash = 0.22      # absorbed, shield holds
 	hull_changed.emit(hull, hull_max)
 	shield_changed.emit(shield, shield_max)
 	if hull <= 0.0:
@@ -460,7 +491,7 @@ func _fire_beam(delta: float) -> void:
 		if victim != null and is_instance_valid(victim) and victim.has_method("take_damage"):
 			var target_class: String = victim.get_ship_class() if victim.has_method("get_ship_class") else "fighter"
 			var dps := Daedalus.beam_dps(base_dps, _beam_elapsed, target_class)
-			victim.take_damage(dps * delta)
+			victim.take_damage(dps * delta, global_position - victim.global_position)
 
 	_beam_line.visible = true
 	_beam_line.points = PackedVector2Array([to_local(from), to_local(end_point)])

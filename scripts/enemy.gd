@@ -45,6 +45,12 @@ const DIVE_TIMEOUT := 3.0
 const INFECT_STEP := 0.18
 const RAM_HIT_RADIUS := 30.0
 
+## Shield bubble visual, ported from the Python prototype's
+## draw_shield_bubble(). Hurtbox radius (20.0) + the original's own
+## +10 bubble_pad. Tinted per-kind using the same KIND_COLORS a
+## wingman's own hull color already draws from.
+const SHIELD_BUBBLE_RADIUS := 30.0
+
 var kind := "fighter"
 var faction := "hostile"       # "hostile" or "player" (wingman)
 var player_key := "daedalus"
@@ -54,6 +60,9 @@ var ship_class_name := "fighter"
 
 var shield := 0.0
 var shield_max := 0.0
+var shield_flash := 0.0      # rim ripple where a hit was just absorbed
+var shield_break := 0.0      # full-bubble flare where the shield just collapsed
+var shield_hit_dir := Vector2.RIGHT   # world-space unit vector: this ship -> impact
 var hull := 0.0
 var hull_max := 0.0
 var max_speed := 0.0
@@ -190,6 +199,21 @@ func _physics_process(delta: float) -> void:
 	var target := _find_target()
 	_tick_timers(delta, target)
 	_move(delta, target)
+	_tick_shield_visual(delta)
+
+
+func _tick_shield_visual(delta: float) -> void:
+	shield_flash = maxf(0.0, shield_flash - delta)
+	shield_break = maxf(0.0, shield_break - delta)
+	queue_redraw()
+
+
+func _draw() -> void:
+	var base_col: Color = WINGMAN_COLOR if faction == "player" else KIND_COLORS.get(kind, Color.WHITE)
+	var hit_dir_local := shield_hit_dir.rotated(-rotation)
+	PlaceholderGfx.draw_shield_bubble(self, SHIELD_BUBBLE_RADIUS,
+			shield / maxf(shield_max, 0.001), shield_flash, hit_dir_local,
+			base_col, shield_break)
 
 
 func _find_target() -> Node2D:
@@ -263,7 +287,7 @@ func _move_dart_dive(delta: float, target: Node2D) -> void:
 	if dist < RAM_HIT_RADIUS:
 		var dmg := Daedalus.dart_ram_damage(velocity.length())
 		if target.has_method("take_damage"):
-			target.take_damage(dmg)
+			target.take_damage(dmg, global_position - target.global_position)
 		_end_dive()
 	elif _dive_elapsed > DIVE_TIMEOUT:
 		_end_dive()
@@ -421,7 +445,7 @@ func _handle_beam_cycle(delta: float, target: Node2D) -> void:
 		_beam_fire_timer -= delta
 		var dps := float(behavior.get("beam_dps", 0.0))
 		if target.has_method("take_damage"):
-			target.take_damage(dps * delta)
+			target.take_damage(dps * delta, global_position - target.global_position)
 		_beam_line.visible = true
 		_beam_line.points = PackedVector2Array([Vector2.ZERO, to_local(target.global_position)])
 		if _beam_fire_timer <= 0.0:
@@ -440,9 +464,12 @@ func _handle_beam_cycle(delta: float, target: Node2D) -> void:
 # Damage / death
 # ==========================================================================
 
-func take_damage(amount: float) -> void:
+func take_damage(amount: float, from_dir: Vector2 = Vector2.ZERO) -> void:
 	if not alive or amount <= 0.0:
 		return
+	if from_dir.length_squared() > 1e-9:
+		shield_hit_dir = from_dir.normalized()
+	var had_shield := shield > 0.0
 	var remaining := amount
 	if shield > 0.0:
 		var absorbed := minf(shield, remaining)
@@ -450,6 +477,11 @@ func take_damage(amount: float) -> void:
 		remaining -= absorbed
 	if remaining > 0.0:
 		hull -= remaining
+	if had_shield:
+		if shield <= 0.0:
+			shield_break = 0.4
+		else:
+			shield_flash = 0.22
 	if hull <= 0.0:
 		_die()
 

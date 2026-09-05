@@ -205,13 +205,13 @@ func _direct_hit(area: Area2D) -> void:
 		var raw := Daedalus.enemy_stat(attacker_kind, "gun_dmg", 0.0)
 		var attacker_class := Daedalus.enemy_class(attacker_kind)
 		damage = Daedalus.effective_damage(raw, attacker_class, target_class)
-		victim.take_damage(damage)
+		victim.take_damage(damage, global_position - victim.global_position)
 	else:
 		var dist := _spawn_pos.distance_to(global_position)
 		var result := Daedalus.fire_weapon(weapon_type, attacker_key, target_class, dist, 0.0)
 		if bool(result.get("hit", false)):
 			damage = float(result.get("damage_dealt", 0.0))
-			victim.take_damage(damage)
+			victim.take_damage(damage, global_position - victim.global_position)
 	_spawn_burst(global_position, damage, damage > 0.0)
 
 
@@ -240,7 +240,7 @@ func _detonate(center: Vector2) -> void:
 		var result := Daedalus.fire_weapon(weapon_type, attacker_key, target_class, dist, 0.0)
 		if bool(result.get("hit", false)):
 			var dealt := float(result.get("damage_dealt", 0.0))
-			victim.take_damage(dealt)
+			victim.take_damage(dealt, center - victim.global_position)
 			best_damage = maxf(best_damage, dealt)
 			hit_any = true
 	_spawn_burst(center, best_damage, hit_any)
