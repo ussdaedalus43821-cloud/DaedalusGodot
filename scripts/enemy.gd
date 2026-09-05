@@ -326,6 +326,25 @@ func _find_target() -> Node2D:
 	return best
 
 
+## God mode's beam interception (see _handle_beam_cycle()) -- the same
+## "nearest OTHER hostile, never self" search projectile.gd runs for a
+## redirected gun round, just over the "hostiles" root-node group directly
+## since this file already has that group, rather than hurtbox children.
+func _nearest_other_hostile() -> Node2D:
+	var best: Node2D = null
+	var best_dist := INF
+	for node in get_tree().get_nodes_in_group("hostiles"):
+		if not is_instance_valid(node) or node == self:
+			continue
+		if "alive" in node and not node.alive:
+			continue
+		var d := global_position.distance_to(node.global_position)
+		if d < best_dist:
+			best_dist = d
+			best = node
+	return best
+
+
 # ==========================================================================
 # Movement
 # ==========================================================================
@@ -536,11 +555,25 @@ func _handle_beam_cycle(delta: float, target: Node2D) -> void:
 			_beam_fire_timer = float(behavior.get("fire_time", 1.5))
 	elif _beam_firing:
 		_beam_fire_timer -= delta
-		var dps := float(behavior.get("beam_dps", 0.0))
-		if target.has_method("take_damage"):
-			target.take_damage(dps * delta, global_position - target.global_position)
-		_beam_line.visible = true
-		_beam_line.points = PackedVector2Array([Vector2.ZERO, to_local(target.global_position)])
+		# Same god-mode interception as a gun round (see projectile.gd),
+		# just without a projectile to bend: an Ori's beam has no travel
+		# time to redirect mid-flight, so instead of damaging/tracking
+		# `target` (always player-side -- see _tick_timers()'s match) it
+		# damages/tracks the nearest OTHER hostile every tick, same as
+		# `target` itself was already being recomputed fresh every tick.
+		# No other hostile to point at -> the beam simply doesn't fire
+		# this tick, same "fizzles rather than reaches the player" choice
+		# projectile.gd makes when it runs out of a target to bend onto.
+		var beam_target := target
+		if GameState.god_mode:
+			beam_target = _nearest_other_hostile()
+		if beam_target != null and beam_target.has_method("take_damage"):
+			var dps := float(behavior.get("beam_dps", 0.0))
+			beam_target.take_damage(dps * delta, global_position - beam_target.global_position)
+			_beam_line.visible = true
+			_beam_line.points = PackedVector2Array([Vector2.ZERO, to_local(beam_target.global_position)])
+		else:
+			_beam_line.visible = false
 		if _beam_fire_timer <= 0.0:
 			_beam_firing = false
 			_beam_line.visible = false
