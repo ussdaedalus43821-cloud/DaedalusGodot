@@ -55,13 +55,15 @@ const HULL_HURTBOX_RADIUS := 20.0
 const SHIELD_BUBBLE_RADIUS := 30.0
 
 ## Wingman-only (faction == "player"; hostiles never dock): once shield
-## drops below DOCK_TRIGGER_FRAC while within DOCK_RANGE of the player, a
-## wingman breaks off combat, flies in close and recharges at
-## DOCK_REGEN_FRAC/sec -- far faster than anything a hostile ever gets,
-## since it's standing inside the player's own shield bubble to do it --
-## until full, resuming its normal behavior either way.
+## drops below DOCK_TRIGGER_FRAC, a wingman breaks off combat -- however
+## far from the player it currently is, since it's out fighting its own
+## targets and is often nowhere near you by the time its shield is
+## actually critical -- and flies flat-out back to the player, then
+## recharges at DOCK_REGEN_FRAC/sec once close enough, far faster than
+## anything a hostile ever gets since it's standing inside the player's
+## own shield bubble to do it, until full, resuming its normal behavior
+## either way.
 const DOCK_TRIGGER_FRAC := 0.3
-const DOCK_RANGE := 220.0
 const DOCK_HOLD_RANGE := 40.0
 const DOCK_REGEN_FRAC := 0.5
 
@@ -110,7 +112,15 @@ var _beam_recharge_timer := 1.0
 var projectiles_root: Node = null
 var combatants_root: Node = null   # where a Hive's launched Darts (or a wingman's own spawns) are added
 var projectile_scene: PackedScene = preload("res://scenes/projectile.tscn")
-var enemy_scene: PackedScene = preload("res://scenes/enemy.tscn")
+
+## load(), not preload(): this script is enemy.tscn's own attached script,
+## so a compile-time preload() of enemy.tscn here would try to load that
+## scene again while it's already mid-load compiling this exact script --
+## a circular resource dependency, which is what "Parse Error: Busy" on
+## enemy.tscn actually was. load() instead runs when an instance is
+## constructed, well after this script has finished compiling, at which
+## point enemy.tscn is already sitting in the resource cache.
+var enemy_scene: PackedScene = load("res://scenes/enemy.tscn")
 
 @onready var _hurtbox: Area2D = $Hurtbox
 @onready var _hurtbox_shape: CollisionShape2D = $Hurtbox/Shape
@@ -257,9 +267,7 @@ func _tick_docking(delta: float) -> bool:
 		return false
 
 	if not docking:
-		var low := shield / maxf(shield_max, 1.0) < DOCK_TRIGGER_FRAC
-		var near := global_position.distance_to(player_ship.global_position) < DOCK_RANGE
-		if low and near:
+		if shield / maxf(shield_max, 1.0) < DOCK_TRIGGER_FRAC:
 			docking = true
 		else:
 			return false
