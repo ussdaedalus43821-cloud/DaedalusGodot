@@ -232,7 +232,7 @@ func _handle_rotation(delta: float) -> void:
 
 	var touch := _touch_joystick()
 	if touch != null and touch.active:
-		var target := touch.direction.angle()
+		var target: float = touch.direction.angle()
 		var diff := wrapf(target - rotation, -PI, PI)
 		var max_delta := turn_rate * delta
 		rotation += clampf(diff, -max_delta, max_delta)
