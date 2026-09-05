@@ -248,12 +248,26 @@ func _build_visual() -> void:
 		_hull_sprite.scale = Vector2(scale_factor, scale_factor)
 		add_child(_hull_sprite)
 		move_child(_hull_sprite, 0)
+		# Sprite2D is centered by default, so the nose sits at roughly
+		# half the hull's own nose-to-tail span -- see the muzzle note
+		# below for why this needs to track the hull at all.
+		_muzzle.position = Vector2(HULL_TARGET_LENGTH * 0.5, 0.0)
 	else:
+		var hull_shape := _hull_shape_for(ship_class_name)
 		_hull_poly = Polygon2D.new()
-		_hull_poly.polygon = _hull_shape_for(ship_class_name)
+		_hull_poly.polygon = hull_shape
 		_hull_poly.color = HULL_COLORS.get(ship_key, Color.WHITE)
 		add_child(_hull_poly)
 		move_child(_hull_poly, 0)
+		# hull_shape[0] is that shape's own nose vertex (see
+		# _hull_shape_for()) -- weapons fire from the ship's actual hull
+		# edge this way, rather than the Muzzle's old fixed (32, 0) in
+		# player.tscn, which happened to sit almost exactly on
+		# SHIELD_BUBBLE_RADIUS (32.0) and made every shot -- and the
+		# beam's raycast origin, which also reads _muzzle.global_position
+		# -- look like it was firing from the shield surface instead of
+		# the hull, on every ship.
+		_muzzle.position = Vector2(hull_shape[0].x, 0.0)
 
 	_beam_line = Line2D.new()
 	_beam_line.width = 4.0
