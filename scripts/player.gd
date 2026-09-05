@@ -148,6 +148,14 @@ func get_ship_class() -> String:
 	return ship_class_name
 
 
+## Public so an attacker can stop a beam/line visual at this ship's
+## current hurtbox surface -- shield bubble while shields hold, hull once
+## they're down -- instead of drawing straight through to its center.
+## Same radii _tick_shield_visual() already resizes the collision shape to.
+func hurtbox_radius() -> float:
+	return SHIELD_BUBBLE_RADIUS if shield > 0.0 else HULL_HURTBOX_RADIUS
+
+
 func is_hardened() -> bool:
 	return hardened
 

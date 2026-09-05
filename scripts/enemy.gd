@@ -197,6 +197,16 @@ func is_wingman() -> bool:
 	return faction == "player"
 
 
+## Public so an attacker (see _handle_beam_cycle()'s own beam, or a
+## redirected player/wingman shot) can stop a beam/line visual at this
+## ship's current hurtbox surface -- shield bubble while shields hold,
+## hull once they're down -- instead of drawing straight through to its
+## center. Same radii _tick_shield_visual() already resizes the
+## collision shape to.
+func hurtbox_radius() -> float:
+	return SHIELD_BUBBLE_RADIUS if shield > 0.0 else HULL_HURTBOX_RADIUS
+
+
 # ==========================================================================
 # Visuals
 # ==========================================================================
@@ -570,8 +580,19 @@ func _handle_beam_cycle(delta: float, target: Node2D) -> void:
 		if beam_target != null and beam_target.has_method("take_damage"):
 			var dps := float(behavior.get("beam_dps", 0.0))
 			beam_target.take_damage(dps * delta, global_position - beam_target.global_position)
+			# Stop the drawn line at beam_target's current hurtbox surface
+			# (shield bubble while shields hold, hull once they're down)
+			# rather than its center -- otherwise the beam visually spears
+			# straight through an intact shield to the hull behind it, even
+			# though take_damage() was already correctly billing the hit to
+			# shield first.
+			var to_target := beam_target.global_position - global_position
+			var stop_radius := 0.0
+			if beam_target.has_method("hurtbox_radius"):
+				stop_radius = beam_target.hurtbox_radius()
+			var beam_end := beam_target.global_position - to_target.normalized() * stop_radius
 			_beam_line.visible = true
-			_beam_line.points = PackedVector2Array([Vector2.ZERO, to_local(beam_target.global_position)])
+			_beam_line.points = PackedVector2Array([Vector2.ZERO, to_local(beam_end)])
 		else:
 			_beam_line.visible = false
 		if _beam_fire_timer <= 0.0:
