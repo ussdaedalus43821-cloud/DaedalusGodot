@@ -60,6 +60,7 @@ func setup(g: Game, p: Player) -> void:
 	player = p
 	_ship_label.text = Daedalus.ship_name(p.ship_key)
 
+	p.ship_changed.connect(func(key): _ship_label.text = Daedalus.ship_name(key))
 	p.power_changed.connect(func(v, vm): _power_bar.max_value = vm; _power_bar.value = v)
 	p.shield_changed.connect(func(v, vm): _shield_bar.max_value = vm; _shield_bar.value = v)
 	p.hull_changed.connect(func(v, vm): _hull_bar.max_value = vm; _hull_bar.value = v)

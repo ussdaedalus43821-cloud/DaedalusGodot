@@ -26,6 +26,7 @@ extends CharacterBody2D
 
 signal died
 signal wingman_requested
+signal ship_changed(key: String)
 signal power_changed(power: float, power_max: float)
 signal shield_changed(shield: float, shield_max: float)
 signal hull_changed(hull: float, hull_max: float)
@@ -107,9 +108,17 @@ func _ready() -> void:
 	# _tick_shield_visual() only ever affects this one ship.
 	_hurtbox_shape.shape = _hurtbox_shape.shape.duplicate()
 	load_ship(ship_key)
-	_build_visual()
 
 
+## The single choke point for "this player is now flying ship `key`" --
+## called from _ready() (initial spawn), game.gd's _cycle_ship() (TAB
+## mid-run), and restore() (resuming a saved run). Rebuilding the visual
+## and re-emitting every stat signal here, rather than leaving callers to
+## remember it, is what keeps a ship switch from leaving stale state
+## behind -- previously _cycle_ship() called this alone, which changed
+## the ship's stats but left the hull sprite/shape AND the HUD's name
+## label and bars showing the ship flown before the switch, including
+## through to the death screen.
 func load_ship(key: String) -> void:
 	ship_key = key
 	stats = Daedalus.get_ship_stats(key)
@@ -128,6 +137,12 @@ func load_ship(key: String) -> void:
 	rockets = ROCKETS_START
 	homing = HOMING_START
 	alive = true
+
+	_build_visual()
+	ship_changed.emit(ship_key)
+	power_changed.emit(power, power_max)
+	shield_changed.emit(shield, shield_max)
+	hull_changed.emit(hull, hull_max)
 
 
 func get_ship_class() -> String:
