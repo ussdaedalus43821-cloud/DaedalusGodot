@@ -54,6 +54,17 @@ const RAM_HIT_RADIUS := 30.0
 const HULL_HURTBOX_RADIUS := 20.0
 const SHIELD_BUBBLE_RADIUS := 30.0
 
+## Wingman-only (faction == "player"; hostiles never dock): once shield
+## drops below DOCK_TRIGGER_FRAC while within DOCK_RANGE of the player, a
+## wingman breaks off combat, flies in close and recharges at
+## DOCK_REGEN_FRAC/sec -- far faster than anything a hostile ever gets,
+## since it's standing inside the player's own shield bubble to do it --
+## until full, resuming its normal behavior either way.
+const DOCK_TRIGGER_FRAC := 0.3
+const DOCK_RANGE := 220.0
+const DOCK_HOLD_RANGE := 40.0
+const DOCK_REGEN_FRAC := 0.5
+
 var kind := "fighter"
 var faction := "hostile"       # "hostile" or "player" (wingman)
 var player_key := "daedalus"
@@ -88,6 +99,7 @@ var _spawn_timer := 5.0
 var _stored_darts := 0
 
 var _fleeing := false
+var docking := false
 
 var _charging := false
 var _charge_timer := 1.0
@@ -204,10 +216,67 @@ func _physics_process(delta: float) -> void:
 	if kind == "replicator":
 		_fleeing = (hull / maxf(hull_max, 1.0)) < float(behavior.get("flee_hull_frac", 0.3))
 
+	if _tick_docking(delta):
+		_tick_shield_visual(delta)
+		return
+
 	var target := _find_target()
 	_tick_timers(delta, target)
 	_move(delta, target)
 	_tick_shield_visual(delta)
+
+
+## Finds the player ship via the same "hurtbox's own group, then its
+## parent" pattern _find_target() already uses -- there is exactly one
+## player, so no distance search is needed.
+func _find_player() -> Node2D:
+	var hb := get_tree().get_first_node_in_group("player_hull")
+	if hb == null or not is_instance_valid(hb):
+		return null
+	# hb.get_parent() is statically just Node -- untyped `=` (not `:=`)
+	# here, then an explicitly Node2D-typed variable below, matching
+	# _find_target()'s own established pattern for this exact shape.
+	var owner_node = hb.get_parent()
+	if owner_node == null or not is_instance_valid(owner_node):
+		return null
+	if "alive" in owner_node and not owner_node.alive:
+		return null
+	var player_ship: Node2D = owner_node
+	return player_ship
+
+
+## Returns true while this wingman is docking/docked, in which case the
+## caller must skip its normal target-finding/combat/movement for this
+## tick entirely -- docking always takes priority over combat.
+func _tick_docking(delta: float) -> bool:
+	if faction != "player":
+		return false
+	var player_ship := _find_player()
+	if player_ship == null:
+		docking = false
+		return false
+
+	if not docking:
+		var low := shield / maxf(shield_max, 1.0) < DOCK_TRIGGER_FRAC
+		var near := global_position.distance_to(player_ship.global_position) < DOCK_RANGE
+		if low and near:
+			docking = true
+		else:
+			return false
+
+	if shield >= shield_max:
+		docking = false
+		return false
+
+	var to_player := player_ship.global_position - global_position
+	if to_player.length() > DOCK_HOLD_RANGE:
+		velocity = to_player.normalized() * max_speed
+		move_and_slide()
+	else:
+		velocity = Vector2.ZERO
+	rotation = to_player.angle()
+	shield = clampf(shield + shield_max * DOCK_REGEN_FRAC * delta, 0.0, shield_max)
+	return true
 
 
 func _tick_shield_visual(delta: float) -> void:
@@ -477,7 +546,7 @@ func _handle_beam_cycle(delta: float, target: Node2D) -> void:
 # ==========================================================================
 
 func take_damage(amount: float, from_dir: Vector2 = Vector2.ZERO) -> void:
-	if not alive or amount <= 0.0:
+	if not alive or amount <= 0.0 or docking:
 		return
 	if from_dir.length_squared() > 1e-9:
 		shield_hit_dir = from_dir.normalized()
