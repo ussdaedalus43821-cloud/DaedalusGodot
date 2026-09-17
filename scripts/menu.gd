@@ -20,36 +20,36 @@ func _ready() -> void:
 	bg.color = Color(0.03, 0.04, 0.07)
 	add_child(bg)
 
+	var menu := VBoxContainer.new()
+	menu.set_anchors_preset(Control.PRESET_TOP_WIDE)
+	menu.position = Vector2(0, 70)
+	menu.add_theme_constant_override("separation", 10)
+	add_child(menu)
+
 	var title := Label.new()
 	title.text = "DAEDALUS"
-	title.set_anchors_preset(Control.PRESET_CENTER_TOP)
-	title.position = Vector2(-160, 90)
-	title.custom_minimum_size = Vector2(320, 48)
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	title.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	title.add_theme_font_size_override("font_size", 40)
-	add_child(title)
+	menu.add_child(title)
 
 	var subtitle := Label.new()
 	subtitle.text = "One small step for Man, one giant leap for Vibe Coders"
-	subtitle.set_anchors_preset(Control.PRESET_CENTER_TOP)
-	subtitle.position = Vector2(-160, 140)
-	subtitle.custom_minimum_size = Vector2(320, 24)
 	subtitle.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	add_child(subtitle)
+	subtitle.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	menu.add_child(subtitle)
 
-	var box := VBoxContainer.new()
-	box.set_anchors_preset(Control.PRESET_CENTER)
-	box.position = Vector2(-110, -60)
-	box.add_theme_constant_override("separation", 10)
-	add_child(box)
+	var spacer := Control.new()
+	spacer.custom_minimum_size = Vector2(0, 24)
+	menu.add_child(spacer)
 
-	_resume_button = _menu_button(box, "Resume", _on_resume_pressed)
+	_resume_button = _menu_button(menu, "Resume", _on_resume_pressed)
 	_resume_button.visible = GameState.has_resume()
-	_menu_button(box, "New Game", _on_new_game_pressed)
-	_menu_button(box, "Select Ship", _on_select_ship_pressed)
-	_menu_button(box, "Settings", _on_settings_pressed)
-	_menu_button(box, "Controls", _on_controls_pressed)
-	_menu_button(box, "Quit", _on_quit_pressed)
+	_menu_button(menu, "New Game", _on_new_game_pressed)
+	_menu_button(menu, "Select Ship", _on_select_ship_pressed)
+	_menu_button(menu, "Settings", _on_settings_pressed)
+	_menu_button(menu, "Controls", _on_controls_pressed)
+	_menu_button(menu, "Quit", _on_quit_pressed)
 
 	_controls_panel = _build_controls_panel()
 
@@ -58,6 +58,7 @@ func _menu_button(parent: Control, text: String, handler: Callable) -> Button:
 	var b := Button.new()
 	b.text = text
 	b.custom_minimum_size = Vector2(220, 42)
+	b.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	b.pressed.connect(handler)
 	parent.add_child(b)
 	return b
