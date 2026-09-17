@@ -30,7 +30,7 @@ func _ready() -> void:
 	add_child(title)
 
 	var subtitle := Label.new()
-	subtitle.text = "a space-combat sim written in NovaLang"
+	subtitle.text = "One small step for man, one giant leap for vibe coders."
 	subtitle.set_anchors_preset(Control.PRESET_CENTER_TOP)
 	subtitle.position = Vector2(-160, 140)
 	subtitle.custom_minimum_size = Vector2(320, 24)
