@@ -10,6 +10,8 @@ config_version=5
 
 config/name="Daedalus"
 config/description="Space-combat sim: ship stats, enemy AI and weapons logic all written in NovaLang, flown from a Godot 4 CharacterBody2D shell."
+config/version="1.0.0"
+config/icon="res://assets/icon.png"
 run/main_scene="res://scenes/ui/menu.tscn"
 config/features=PackedStringArray("4.4", "GL Compatibility")
 boot_splash/bg_color=Color(0.03, 0.04, 0.07, 1)

@@ -26,6 +26,21 @@ Open this folder in Godot 4.3+ (`daedalus_godot/`, not the repo root) and
 press F5. There is nothing to install. The title screen
 (`scenes/ui/menu.tscn`) is the entry point.
 
+## Building a release
+
+Desktop builds are what ship on itch.io. With Godot 4.7.2 and its export
+templates installed, from this folder:
+
+```
+godot --headless --import
+godot --headless --export-release "Windows Desktop" ../build/windows/Daedalus.exe
+godot --headless --export-release "macOS" ../build/macos/Daedalus.zip
+godot --headless --export-release "Linux" ../build/linux/Daedalus.x86_64
+```
+
+Zip each platform's output separately and upload each zip to itch with
+its platform ticked (Windows / macOS / Linux), not "played in the browser".
+
 ## Controls
 
 | Key | Action |
@@ -143,11 +158,12 @@ something on the list needed it to actually work:
   `scripts/audio_bus.gd`, `scripts/input_map_setup.gd`,
   `scripts/placeholder_gfx.gd` — glue and infrastructure explained above
   and in each file's own header comment.
-- `export_presets.cfg` — macOS/iOS/Web presets mirroring the sibling
-  Reactor Sim project's, with the same critical detail: `.nova` files are
-  not Godot resources, so every preset's `include_filter` explicitly
-  ships `scripts_nova/*.nova` or an exported build has no ship stats, no
-  enemy AI and no weapons at all.
+- `export_presets.cfg` — Windows/macOS/Linux desktop presets (the
+  itch.io release builds) plus iOS. There is deliberately no Web preset:
+  Daedalus ships as a download. The critical detail, same as the sibling
+  Reactor Sim project: `.nova` files are not Godot resources, so every
+  preset's `include_filter` explicitly ships `scripts_nova/*.nova` or an
+  exported build has no ship stats, no enemy AI and no weapons at all.
 
 ## Modding
 
