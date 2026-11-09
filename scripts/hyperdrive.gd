@@ -117,9 +117,15 @@ func _draw_streaks(canvas: Control) -> void:
 
 func _build_sector_list() -> void:
 	_sector_list_label = Label.new()
+	# Pinned 20px off the bottom-left and grown upward, so every sector in
+	# SECTORS fits no matter how many there are -- a fixed top offset let
+	# the list run off the bottom of the screen past the sixth entry.
 	_sector_list_label.set_anchors_preset(Control.PRESET_BOTTOM_LEFT)
-	_sector_list_label.position = Vector2(20, -190)
-	_sector_list_label.custom_minimum_size = Vector2(420, 180)
+	_sector_list_label.grow_vertical = Control.GROW_DIRECTION_BEGIN
+	_sector_list_label.offset_left = 20
+	_sector_list_label.offset_top = -20
+	_sector_list_label.offset_bottom = -20
+	_sector_list_label.custom_minimum_size = Vector2(420, 0)
 	add_child(_sector_list_label)
 
 
