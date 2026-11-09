@@ -1,5 +1,11 @@
 # Daedalus
 
+> **Powered by NovaLang.** Ship stats, enemy AI, weapons and the live advisor
+> are [NovaLang](https://github.com/ussdaedalus43821-cloud/Nova_Lang) scripts (`scripts_nova/*.nova`), run by the GDScript
+> NovaLang engine in `scripts/nova/`: the same engine Reactor Sim ships,
+> synced from Reactor-Game at `95683f3`. Edit the `.nova` files to mod the
+> game; see `MODDING_DAEDALUS.md`.
+
 A space-combat game whose ship stats, enemy AI and weapons logic are all
 written in NovaLang — the same language and interpreter built for this
 repository's Reactor Sim, embedded here as plain GDScript
